@@ -50,6 +50,28 @@ export async function POST(request: NextRequest) {
         })
 
         console.log(`Ticket created: ${ticketId} for user ${userId} and event ${eventId}`)
+
+        // ── Finance Dashboard: record income transaction ──
+        if (userId) {
+          await supabase.from("transactions").upsert({
+            user_id: userId,
+            type: "income",
+            amount: payment.transaction_amount,
+            currency: payment.currency_id ?? "ARS",
+            description: payment.description ?? `Pago MP #${paymentId}`,
+            source: "mercadopago",
+            source_id: String(paymentId),
+            date: payment.date_approved ?? payment.date_created ?? new Date().toISOString(),
+            context: "personal",
+            metadata: {
+              payment_method: payment.payment_method_id,
+              payer: payment.payer?.email,
+              external_reference: externalReference,
+              event_id: eventId,
+            },
+          }, { onConflict: "user_id,source,source_id", ignoreDuplicates: true })
+          console.log(`Finance transaction recorded for payment ${paymentId}`)
+        }
       }
     }
 
